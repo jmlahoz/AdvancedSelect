@@ -20,7 +20,7 @@
 # This script moves the cursor to the point of minimum amplitude within a selection.
 # This is an Editor script.
 
-include utils.praat
+include auxiliary.praat
 
 ini = Get start of selection
 end = Get end of selection

@@ -20,7 +20,7 @@
 # This script will save the selected portion of a sound together with the corresponding portion of the TextGrid, all at once.
 # This is an Editor script.
 
-include utils.praat
+include auxiliary.praat
 
 # Info to switch between objects window and editor window
 @getinfo: 0

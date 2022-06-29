@@ -312,10 +312,20 @@ if .isint = 1
 endif
 endproc
 
+procedure get_current_index .tier .isint .t
+if .isint = 0
+.return = 0
+.return = Get low index from time... .tier .t
+endif
+if .isint = 1
+.return = Get interval at time... .tier .t
+endif
+endproc
+
 procedure get_low_index .tier .isint .t
 if .isint = 0
 .return = 0
-nocheck .return = Get low index from time... .tier .t
+.return = Get low index from time... .tier .t
 endif
 if .isint = 1
 .return = Get low interval at time... .tier .t
@@ -325,10 +335,37 @@ endproc
 procedure get_high_index .tier .isint .t
 if .isint = 0
 .return = 0
-nocheck .return = Get high index from time... .tier .t
+.return = Get high index from time... .tier .t
 endif
 if .isint = 1
 .return = Get high interval at time... .tier .t
+endif
+endproc
+
+procedure get_label_of_index .tier .isint .id
+if .isint = 0
+.return$ = Get label of point... .tier .id
+endif
+if .isint = 1
+.return$ = Get label of interval... .tier .id
+endif
+endproc
+
+procedure insert_index .tier .isint .t
+if .isint = 0
+nocheck Insert point... .tier .t
+endif
+if .isint = 1
+nocheck Insert boundary... .tier .t
+endif
+endproc
+
+procedure set_index_text .tier .isint .id .lab$
+if .isint = 0
+nocheck Set point text... .tier .id '.lab$'
+endif
+if .isint = 1
+nocheck Set interval text... .tier .id '.lab$'
 endif
 endproc
 

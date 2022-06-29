@@ -20,7 +20,7 @@
 # This script moves the cursor to a point within a selection that is located at the X% of the total duration.
 # This is an Editor script.
 
-include utils.praat
+include auxiliary.praat
 
 form Move cursor to X% of selection...
 real pct 
