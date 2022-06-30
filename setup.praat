@@ -1,5 +1,5 @@
 # LICENSE
-# (C) 2021 José María Lahoz-Bengoechea
+# (C) 2022 José María Lahoz-Bengoechea
 # This file is part of the plugin_AdvancedSelect.
 # This is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License
