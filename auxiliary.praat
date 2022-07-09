@@ -253,6 +253,43 @@ endproc
 ##}
 
 
+##{ getsegmentid
+# In case of TG, this gets segment id and whether or not nasal context (for better formant calculation).
+# It works in combination with fn_check.
+procedure getsegmentid
+phonesTID = 0
+if data_type$ = "TextGrid"
+@selobj: 0, 1
+@findtierbyname: "phones", 0, 1
+phonesTID = findtierbyname.return
+if phonesTID != 0
+intini = Get high interval at time... phonesTID ini
+intend = Get low interval at time... phonesTID end
+if intini = intend
+segment_id$ = Get label of interval... phonesTID intini
+nint = Get number of intervals... phonesTID
+if intend < nint
+next$ = Get label of interval... phonesTID intend+1
+else
+next$ = ""
+endif
+if next$ = "m" or next$ = "n" or next$ = "\nj"
+nasal_context$ = "yes"
+nasal_context = 2
+else
+nasal_context$ = "no"
+nasal_context = 1
+endif
+else
+segment_id$ = ""
+nasal_context = 1
+endif
+endif
+endif
+endproc
+##}
+
+
 ##{ toaltfn
 # This requires the selection of a Sound object.
 # It creates a Formant object with standard parameters,
@@ -265,6 +302,34 @@ fn = selected("Formant")
 select .so
 noprogress To Formant (burg)... 0 4 3800 0.015 50
 altfn = selected("Formant")
+endproc
+##}
+
+
+##{ getformants
+# Calculates formant frequency (F1-F3) and bandwidth (B1-B3),
+# and invokes an algorithm of formant correction in case of atypical values.
+procedure getformants .t .segment_id$ .nasalctxt$
+f1 = Get value at time... 1 .t hertz Linear
+f2 = Get value at time... 2 .t hertz Linear
+f3 = Get value at time... 3 .t hertz Linear
+if .segment_id$ = "" and .nasalctxt$ = "no"
+b1 = Get bandwidth at time... 1 .t hertz Linear
+b2 = Get bandwidth at time... 2 .t hertz Linear
+b3 = Get bandwidth at time... 3 .t hertz Linear
+else
+@resetfnflags
+@fn_check: 'f1', 1, '.t', .segment_id$, .nasalctxt$, ""
+f1 = fn_check.resultfn
+b1 = fn_check.resultbn
+@fn_check: 'f2', 2, '.t', .segment_id$, .nasalctxt$, ""
+f2 = fn_check.resultfn
+b2 = fn_check.resultbn
+@fn_check: 'f3', 3, '.t', .segment_id$, .nasalctxt$, "'f2'"
+f3 = fn_check.resultfn
+b3 = fn_check.resultbn
+@resetfnflags
+endif
 endproc
 ##}
 
@@ -395,6 +460,69 @@ endif
 
 endif
 
+endproc
+##}
+
+
+##{ f0_check
+# When f0 is undefined, this calculates f0 as the inverse of the period, estimated from pulses.
+procedure f0_check .f0 .t1 .t2 .pulses
+if .f0 != undefined
+.f0 = .f0
+else
+select .pulses
+if .t1 = .t2 ; f0 value at time
+.inipulse = Get low index... .t1
+.endpulse = Get high index... .t2
+.tpt1 = Get time from index... .inipulse
+.tpt2 = Get time from index... .endpulse
+.f0 = 1/(.tpt2 - .tpt1)
+else ; f0 mean of interval
+.inipulse = Get nearest index... .t1
+.endpulse = Get nearest index... .t2
+.ncycle = .endpulse - .inipulse
+.tor = Create TableOfReal... tor .ncycle 1
+for .ipulse from .inipulse to .endpulse-1
+select pulses
+.tpt1 = Get time from index... .ipulse
+.tpt2 = Get time from index... .ipulse+1
+.durperiod = .tpt2 - .tpt1
+select .tor
+.nr = .ipulse - .inipulse + 1
+Set value... .nr 1 .durperiod
+endfor
+.meanperiod_tor = Get column mean (index)... 1
+.f0 = 1/.meanperiod_tor
+select .tor
+Remove
+endif
+endif
+endproc
+##}
+
+
+##{ getlocalminpitch
+# This gets the real f0 floor in a certain stretch of time.
+# In case of undefined values, it is manually calculated as the inverse of the period, estimated from pulses.
+procedure getlocalminpitch .ini .end
+select pitch
+.local_min_pitch = Get minimum... .ini .end Hertz Parabolic
+if .local_min_pitch = undefined
+select pulses
+.inipulse = Get nearest index... .ini
+.endpulse = Get nearest index... .end
+.tmpperiod = 0
+for .ipulse from .inipulse to .endpulse-1
+select pulses
+.tpt1 = Get time from index... .ipulse
+.tpt2 = Get time from index... .ipulse+1
+.durperiod = .tpt2 - .tpt1
+if .durperiod > .tmpperiod
+.tmpperiod = .durperiod
+endif
+endfor
+.local_min_pitch = 1/.tmpperiod
+endif
 endproc
 ##}
 
@@ -570,6 +698,7 @@ procedure spectral_analysis .t .f0 .f1 .b1 .f2 .b2 .f3 .b3
 select pulses
 .npulses = Get number of points
 .curpulse = Get low index... .t
+# The analysis requires a window that comprises 7 glottal cycles.
 .inipulse = .curpulse - 3
 .endpulse = .curpulse + 4
 if .inipulse > 0 and .endpulse <= .npulses
@@ -601,25 +730,8 @@ else
 goto missing_data
 endif
 
-select pitch
-.local_min_pitch = Get minimum... .ini .end Hertz Parabolic
-if .local_min_pitch = undefined
-select pulses
-.tmpperiod = 0
-for .ipulse from .inipulse to .endpulse-1
-select pulses
-.tpt1 = Get time from index... .ipulse
-.tpt2 = Get time from index... .ipulse+1
-.durperiod = .tpt2 - .tpt1
-if .durperiod > .tmpperiod
-.tmpperiod = .durperiod
-endif
-endfor
-.local_min_pitch = 1/.tmpperiod
-endif
-
 # Extract 7-cycle window to get corresponding spectrum (LTAS).
-select so
+@selobj: 1, 0
 noprogress Extract part... .ini .end Hamming 1 yes
 .sound4ltas = selected("Sound")
 
@@ -715,16 +827,16 @@ endfor
 .wh2k = 2*pi*.fh2k/fs
 .wa1 = 2*pi*.ff1/fs
 
-call correction .h1 .wh1
-.h1c = correction.amplitude
-call correction .h2 .wh2
-.h2c = correction.amplitude
-call correction .h4 .wh4
-.h4c = correction.amplitude
-call correction .h2k .wh2k
-.h2kc = correction.amplitude
-call correction .a1 .wa1
-.a1c = correction.amplitude
+call spectral_correction .h1 .wh1
+.h1c = spectral_correction.amplitude
+call spectral_correction .h2 .wh2
+.h2c = spectral_correction.amplitude
+call spectral_correction .h4 .wh4
+.h4c = spectral_correction.amplitude
+call spectral_correction .h2k .wh2k
+.h2kc = spectral_correction.amplitude
+call spectral_correction .a1 .wa1
+.a1c = spectral_correction.amplitude
 
 # Calculate measures of spectral slope
 # Gobl, C., & Ní Chasaide, A. (2010). Voice source variation and its communicative functions. In W. J. Hardcastle, J. Laver, & F. E. Gibbon (Eds.), The handbook of phonetic sciences (2nd ed., pp. 378–423). Oxford: Wiley-Blackwell.
@@ -750,14 +862,64 @@ endproc
 ##}
 
 
-##{ correction
+##{ spectral_correction
 # This is part of the algorithm to compensate for the vicinity of a formant when calculating harmonic amplitude.
 # It works in combination with spectral_analysis.
 # Iseli, M., & Alwan, A. (2004). An improved correction formula for the estimation of harmonic magnitudes and its application to open quotient estimation. Proceedings of the IEEE International Conference on Acoustics, Speech, and Signal Processing.
-procedure correction .amplitude .w
+procedure spectral_correction .amplitude .w
 for .i from 1 to 3
 .amplitude = .amplitude - 10*log10((r'.i'^2+1-2*r'.i'*cos(w'.i'))^2/((r'.i'^2+1-2*r'.i'*cos(w'.i'+.w))*(r'.i'^2+1-2*r'.i'*cos(w'.i'-.w))))
 endfor
 endproc
 ##}
 
+
+##{ topulses
+# This reads a pulses object associated to the sound or creates a new one if it does not exist.
+# This works in combination with setpulses.
+procedure topulses
+if !variableExists ("pulses$")
+pulses = noprogress To PointProcess (periodic, cc)... 'pitch_floor' 'pitch_ceiling'
+@setpulses
+elsif !fileReadable (pulses$)
+pulses = noprogress To PointProcess (periodic, cc)... 'pitch_floor' 'pitch_ceiling'
+@setpulses
+elsif fileReadable (pulses$)
+pulses = Read from file... 'pulses$'
+endif
+endproc
+##}
+
+
+##{ setpulses
+# This works in combination with topulses.
+# In case of creaky voice, this allows manual selection of pulses to improve calculations.
+procedure setpulses
+if variableExists ("voice_register")
+if voice_register = 2
+Remove points between... editor_start editor_end
+label manual_pulses
+editor
+beginPause: "Pincha en un pulso"
+clicked = endPause: "OK y añadir otro", "OK y fin", "No hay más puntos", 1
+tpt = Get cursor
+endeditor
+if clicked = 3
+goto no_more_points
+endif
+select pulses
+Add point... tpt
+if clicked = 1
+goto manual_pulses
+endif
+label no_more_points
+select pulses
+if pulses$ = ""
+points_name$ = data_name$ + ".PointProcess"
+pulses$ = chooseWriteFile$: "Save as binary file...", points_name$
+endif
+Save as binary file... 'pulses$'
+endif
+endif
+endproc
+##}
