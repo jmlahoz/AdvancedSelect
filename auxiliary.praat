@@ -637,8 +637,8 @@ endproc
 
 
 ##{ countCharacter
-# This returns the total number of occurrences of a string within another string.
-procedure countCharacter .ch$ .str$
+# This returns the total number of occurrences of a string (.ch$) within another string (.str$).
+procedure countCharacter .str$ .ch$
 .ch_length = length(.ch$)
 .count = 0
 for .i from 1 to length(.str$)-.ch_length+1
