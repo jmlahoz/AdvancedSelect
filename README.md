@@ -26,7 +26,7 @@ How to install AdvancedSelect as a Praat plugin in a permanent fashion:
    This is always under your user folder, but the location varies depending on your operating system.
    (In each case, change user_name for your actual user name).
    --On Windows, go to C:\Users\user_name\Praat
-   --On Mac, go to /Users/user_name/Library/Preferences/Praat Prefs/
+   --On Mac, go to /Users/user_name/Library/Preferences/Praat Prefs/ (You may need to make invisible folders visible by pressing Command+Shift+Period)
    --On Linux, go to /home/user_name/.praat-dir
 2. Create a subfolder named plugin_AdvancedSelect
    (this is case-sensitive).
